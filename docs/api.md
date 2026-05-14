@@ -315,3 +315,159 @@ Capability removed:
 ```text
 identity.organization_capability.removed
 ```
+
+
+
+## Memberships
+
+### `POST /api/v1/memberships`
+
+Creates an active organization membership.
+
+The referenced person and organization must both exist and be `ACTIVE`.
+
+Request:
+
+```json
+{
+  "person_id": "PER-...",
+  "organization_id": "ORG-...",
+  "membership_type": "PROVIDER_STAFF"
+}
+```
+
+Allowed membership types:
+
+```text
+EMPLOYEE
+PROVIDER_STAFF
+AGENCY_STAFF
+FINANCIAL_OPERATOR
+AUDITOR
+SYSTEM_ADMIN
+```
+
+Response:
+
+```json
+{
+  "correlation_id": "corr-...",
+  "data": {
+    "id": "MEM-...",
+    "person_id": "PER-...",
+    "organization_id": "ORG-...",
+    "membership_type": "PROVIDER_STAFF",
+    "status": "ACTIVE",
+    "starts_at": "2026-05-14T15:00:00Z",
+    "ends_at": null,
+    "created_at": "2026-05-14T15:00:00Z",
+    "updated_at": "2026-05-14T15:00:00Z"
+  }
+}
+```
+
+### `GET /api/v1/memberships/{membership_id}`
+
+Returns a membership by ID.
+
+### `GET /api/v1/persons/{person_id}/memberships`
+
+Lists memberships for a person.
+
+### `GET /api/v1/organizations/{organization_id}/memberships`
+
+Lists memberships for an organization.
+
+### `PATCH /api/v1/memberships/{membership_id}/status`
+
+Updates membership status.
+
+Request:
+
+```json
+{
+  "status": "SUSPENDED"
+}
+```
+
+Allowed statuses:
+
+```text
+ACTIVE
+SUSPENDED
+ENDED
+PENDING
+```
+
+When status is set to `ENDED`, `ends_at` is set if it was previously null.
+
+### `POST /api/v1/memberships/{membership_id}/roles`
+
+Adds a role to an active membership.
+
+Request:
+
+```json
+{
+  "role": "PROVIDER_CLINICIAN"
+}
+```
+
+Allowed roles:
+
+```text
+CITIZEN
+PROVIDER_CLINICIAN
+PROVIDER_CLAIMS_OFFICER
+CARE_ADJUDICATOR
+TAX_OFFICER
+EMPLOYER_SUBMITTER
+PAY_OPERATOR
+OBSERVE_ANALYST
+OBSERVE_AUDITOR
+SYSTEM_ADMIN
+```
+
+### `GET /api/v1/memberships/{membership_id}/roles`
+
+Lists roles for a membership.
+
+### `DELETE /api/v1/memberships/{membership_id}/roles/{role}`
+
+Removes a role from a membership.
+
+Example:
+
+```powershell
+Invoke-RestMethod `
+  -Method Delete `
+  -Uri "http://localhost:8080/api/v1/memberships/MEM-.../roles/PROVIDER_CLINICIAN"
+```
+
+## Membership Audit Events
+
+Membership mutations write to `audit_outbox`.
+
+Created membership:
+
+```text
+identity.membership.created
+```
+
+Status changed:
+
+```text
+identity.membership.status_changed
+```
+
+Role added:
+
+```text
+identity.membership_role.added
+```
+
+Role removed:
+
+```text
+identity.membership_role.removed
+```

@@ -779,9 +779,7 @@ identity.auth.token_introspected
 
 ### Actor context
 
-```text
 POST /api/v1/actor-context/resolve
-```
 
 Actor-context resolution turns a valid authenticated person into an organization-scoped actor context.
 

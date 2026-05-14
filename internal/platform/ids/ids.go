@@ -60,7 +60,19 @@ func NewEventID() string {
 }
 
 func NewCorrelationID() string {
-	return New("corr")
+	random := make([]byte, 8)
+	if _, err := rand.Read(random); err != nil {
+		return fmt.Sprintf(
+			"corr-%s-fallback",
+			time.Now().UTC().Format("20060102150405"),
+		)
+	}
+
+	return fmt.Sprintf(
+		"corr-%s-%s",
+		time.Now().UTC().Format("20060102150405"),
+		hex.EncodeToString(random),
+	)
 }
 
 func NewActorContextID() string {

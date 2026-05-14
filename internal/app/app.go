@@ -12,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"taifa-id/internal/config"
+	"taifa-id/internal/person"
+	"taifa-id/internal/platform/clock"
 	"taifa-id/internal/platform/httpserver"
 	"taifa-id/internal/platform/postgres"
 )
@@ -84,6 +86,10 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		})
 	})
 
+	if dbPool != nil {
+		registerDomainRoutes(router, dbPool)
+	}
+
 	server := httpserver.New(httpserver.Config{
 		Addr:         cfg.HTTP.Addr,
 		ReadTimeout:  cfg.HTTP.ReadTimeout,
@@ -97,6 +103,15 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		dbPool:     dbPool,
 		httpServer: server,
 	}, nil
+}
+
+func registerDomainRoutes(router chi.Router, dbPool *pgxpool.Pool) {
+	realClock := clock.NewRealClock()
+
+	personRepository := person.NewRepository(dbPool)
+	personService := person.NewService(dbPool, personRepository, realClock)
+	personHandler := person.NewHandler(personService)
+	person.RegisterRoutes(router, personHandler)
 }
 
 func (a *App) Run(ctx context.Context) error {

@@ -8,13 +8,13 @@ import (
 type ErrorCode string
 
 const (
-	ErrorCodeValidation    ErrorCode = "VALIDATION_ERROR"
-	ErrorCodeNotFound      ErrorCode = "NOT_FOUND"
-	ErrorCodeConflict      ErrorCode = "CONFLICT"
-	ErrorCodeUnauthorized  ErrorCode = "UNAUTHORIZED"
-	ErrorCodeForbidden     ErrorCode = "FORBIDDEN"
-	ErrorCodeInternal      ErrorCode = "INTERNAL_ERROR"
-	ErrorCodeInvalidJSON   ErrorCode = "INVALID_JSON"
+	ErrorCodeValidation       ErrorCode = "VALIDATION_ERROR"
+	ErrorCodeNotFound         ErrorCode = "NOT_FOUND"
+	ErrorCodeConflict         ErrorCode = "CONFLICT"
+	ErrorCodeUnauthorized     ErrorCode = "UNAUTHORIZED"
+	ErrorCodeForbidden        ErrorCode = "FORBIDDEN"
+	ErrorCodeInternal         ErrorCode = "INTERNAL_ERROR"
+	ErrorCodeInvalidJSON      ErrorCode = "INVALID_JSON"
 	ErrorCodeMethodNotAllowed ErrorCode = "METHOD_NOT_ALLOWED"
 )
 

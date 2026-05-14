@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -12,6 +11,8 @@ import (
 	"taifa-id/internal/platform/postgres"
 	"taifa-id/internal/seed"
 )
+
+const defaultSeedTimeout = 5 * time.Minute
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -24,7 +25,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	seedTimeout := envDuration("TAIFA_ID_SEED_TIMEOUT", defaultSeedTimeout)
+
+	ctx, cancel := context.WithTimeout(context.Background(), seedTimeout)
 	defer cancel()
 
 	dbPool, err := postgres.Open(ctx, postgres.Config{
@@ -39,10 +42,7 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	seedPassword := os.Getenv("TAIFA_ID_SEED_PASSWORD")
-	if seedPassword == "" {
-		seedPassword = seed.DefaultSeedPassword
-	}
+	seedPassword, seedPasswordFromEnv := seedPassword()
 
 	runner := seed.NewRunner(
 		dbPool,
@@ -67,8 +67,33 @@ func main() {
 		"roles", result.Roles,
 		"credentials", result.Credentials,
 		"audit_events", result.AuditEvents,
+		"timeout", seedTimeout.String(),
+		"seed_password_from_env", seedPasswordFromEnv,
 	)
 
-	fmt.Println("Seed credentials use usernames ending in .seed")
-	fmt.Println("Default seed password:", seedPassword)
+	logger.Info("seed credential usernames use the .seed suffix")
+	logger.Info("seed password value was not printed")
+}
+
+func seedPassword() (string, bool) {
+	value := os.Getenv("TAIFA_ID_SEED_PASSWORD")
+	if value == "" {
+		return seed.DefaultSeedPassword, false
+	}
+
+	return value, true
+}
+
+func envDuration(key string, fallback time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+
+	return parsed
 }

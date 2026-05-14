@@ -3,24 +3,44 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"taifa-id/internal/config"
 	"taifa-id/internal/platform/httpserver"
+	"taifa-id/internal/platform/postgres"
 )
 
 type App struct {
 	cfg        config.Config
 	logger     *slog.Logger
+	dbPool     *pgxpool.Pool
 	httpServer *http.Server
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	if logger == nil {
 		logger = slog.Default()
+	}
+
+	var dbPool *pgxpool.Pool
+	if cfg.Database.DSN != "" {
+		pool, err := postgres.Open(context.Background(), postgres.Config{
+			DSN:            cfg.Database.DSN,
+			MinConns:       cfg.Database.MinConns,
+			MaxConns:       cfg.Database.MaxConns,
+			ConnectTimeout: cfg.Database.ConnectTimeout,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("open postgres: %w", err)
+		}
+
+		dbPool = pool
 	}
 
 	router := chi.NewRouter()
@@ -38,11 +58,28 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	})
 
 	router.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
-		httpserver.WriteJSON(w, r, http.StatusOK, map[string]any{
-			"status":  "ok",
+		statusCode := http.StatusOK
+		status := "ok"
+		databaseStatus := "not_configured"
+
+		if dbPool != nil {
+			pingCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			defer cancel()
+
+			if err := postgres.Ping(pingCtx, dbPool); err != nil {
+				statusCode = http.StatusServiceUnavailable
+				status = "degraded"
+				databaseStatus = "unavailable"
+			} else {
+				databaseStatus = "ok"
+			}
+		}
+
+		httpserver.WriteJSON(w, r, statusCode, map[string]any{
+			"status":  status,
 			"service": cfg.ServiceName,
 			"dependencies": map[string]string{
-				"database": "not_configured",
+				"database": databaseStatus,
 			},
 		})
 	})
@@ -57,6 +94,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	return &App{
 		cfg:        cfg,
 		logger:     logger,
+		dbPool:     dbPool,
 		httpServer: server,
 	}, nil
 }
@@ -92,10 +130,19 @@ func (a *App) Run(ctx context.Context) error {
 			return err
 		}
 
+		if a.dbPool != nil {
+			a.dbPool.Close()
+			a.logger.Info("postgres pool closed")
+		}
+
 		a.logger.Info("HTTP server stopped cleanly")
 		return nil
 
 	case err := <-serverErrors:
+		if a.dbPool != nil {
+			a.dbPool.Close()
+		}
+
 		return err
 	}
 }

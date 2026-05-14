@@ -20,7 +20,7 @@ func CorrelationIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		correlationID := r.Header.Get(CorrelationIDHeader)
 		if correlationID == "" {
-			correlationID = ids.New("corr")
+			correlationID = ids.NewCorrelationID()
 		}
 
 		w.Header().Set(CorrelationIDHeader, correlationID)

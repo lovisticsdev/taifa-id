@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -17,11 +16,7 @@ func main() {
 		Level: slog.LevelInfo,
 	}))
 
-	cfg, err := config.Load()
-	if err != nil {
-		logger.Error("failed to load config", "error", err)
-		os.Exit(1)
-	}
+	cfg := config.Load()
 
 	application, err := app.New(cfg, logger)
 	if err != nil {
@@ -37,9 +32,7 @@ func main() {
 	defer stop()
 
 	if err := application.Run(ctx); err != nil {
-		if !errors.Is(err, context.Canceled) {
-			logger.Error("application stopped with error", "error", err)
-			os.Exit(1)
-		}
+		logger.Error("application stopped with error", "error", err)
+		os.Exit(1)
 	}
 }

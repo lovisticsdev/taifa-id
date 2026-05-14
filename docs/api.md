@@ -543,3 +543,110 @@ Created credential:
 ```text
 identity.credential.created
 ```
+
+## Authentication
+
+### `POST /api/v1/auth/login`
+
+Authenticates a credential and returns a JWT access token.
+
+Request:
+
+```json
+{
+  "username": "amina.credential",
+  "password": "ExampleDevPass123!"
+}
+```
+
+Response:
+
+```json
+{
+  "correlation_id": "corr-...",
+  "data": {
+    "access_token": "eyJ...",
+    "token_type": "Bearer",
+    "expires_at": "2026-05-14T18:00:00Z",
+    "session_id": "SES-...",
+    "person_id": "PER-...",
+    "credential_id": "CRD-...",
+    "username": "amina.credential"
+  }
+}
+```
+
+The JWT proves authentication only. It does not carry complete authorization truth.
+
+Authorization remains split:
+
+```text
+TaifaID:
+  authentication and actor identity
+
+TaifaExchange:
+  request-boundary authorization
+
+Domain system:
+  domain-specific authorization
+```
+
+### `POST /api/v1/auth/introspect`
+
+Validates a JWT and checks that the referenced person and credential are still active.
+
+Request:
+
+```json
+{
+  "token": "eyJ..."
+}
+```
+
+Response for an active token:
+
+```json
+{
+  "correlation_id": "corr-...",
+  "data": {
+    "active": true,
+    "person_id": "PER-...",
+    "credential_id": "CRD-...",
+    "username": "amina.credential",
+    "session_id": "SES-...",
+    "issued_at": "2026-05-14T17:00:00Z",
+    "expires_at": "2026-05-14T18:00:00Z"
+  }
+}
+```
+
+Response for an invalid, expired, disabled, or revoked-by-status token:
+
+```json
+{
+  "correlation_id": "corr-...",
+  "data": {
+    "active": false
+  }
+}
+```
+
+## Authentication Audit Events
+
+Successful login:
+
+```text
+identity.auth.succeeded
+```
+
+Failed login:
+
+```text
+identity.auth.failed
+```
+
+Token introspection:
+
+```text
+identity.auth.token_introspected
+```

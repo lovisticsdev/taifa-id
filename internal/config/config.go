@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -12,6 +11,7 @@ type Config struct {
 	Environment string
 	HTTP        HTTPConfig
 	Database    DatabaseConfig
+	Auth        AuthConfig
 }
 
 type HTTPConfig struct {
@@ -29,41 +29,40 @@ type DatabaseConfig struct {
 	ConnectTimeout time.Duration
 }
 
-func Load() (Config, error) {
-	cfg := Config{
-		ServiceName: getEnv("TAIFA_ID_SERVICE_NAME", "taifa-id"),
-		Environment: getEnv("TAIFA_ID_ENV", "local"),
-		HTTP: HTTPConfig{
-			Addr:            getEnv("TAIFA_ID_HTTP_ADDR", ":8080"),
-			ReadTimeout:     getDurationEnv("TAIFA_ID_HTTP_READ_TIMEOUT", 5*time.Second),
-			WriteTimeout:    getDurationEnv("TAIFA_ID_HTTP_WRITE_TIMEOUT", 10*time.Second),
-			IdleTimeout:     getDurationEnv("TAIFA_ID_HTTP_IDLE_TIMEOUT", 60*time.Second),
-			ShutdownTimeout: getDurationEnv("TAIFA_ID_HTTP_SHUTDOWN_TIMEOUT", 10*time.Second),
-		},
-		Database: DatabaseConfig{
-			DSN:            getEnv("TAIFA_ID_DATABASE_DSN", ""),
-			MinConns:       getInt32Env("TAIFA_ID_DATABASE_MIN_CONNS", 1),
-			MaxConns:       getInt32Env("TAIFA_ID_DATABASE_MAX_CONNS", 5),
-			ConnectTimeout: getDurationEnv("TAIFA_ID_DATABASE_CONNECT_TIMEOUT", 5*time.Second),
-		},
-	}
-
-	if cfg.ServiceName == "" {
-		return Config{}, fmt.Errorf("TAIFA_ID_SERVICE_NAME must not be empty")
-	}
-
-	if cfg.HTTP.Addr == "" {
-		return Config{}, fmt.Errorf("TAIFA_ID_HTTP_ADDR must not be empty")
-	}
-
-	if cfg.Database.MaxConns < cfg.Database.MinConns {
-		return Config{}, fmt.Errorf("TAIFA_ID_DATABASE_MAX_CONNS must be greater than or equal to TAIFA_ID_DATABASE_MIN_CONNS")
-	}
-
-	return cfg, nil
+type AuthConfig struct {
+	JWTSecret   string
+	JWTIssuer   string
+	JWTAudience string
+	JWTTTL      time.Duration
 }
 
-func getEnv(key string, fallback string) string {
+func Load() Config {
+	return Config{
+		ServiceName: envString("TAIFA_ID_SERVICE_NAME", "taifa-id"),
+		Environment: envString("TAIFA_ID_ENV", "local"),
+		HTTP: HTTPConfig{
+			Addr:            envString("TAIFA_ID_HTTP_ADDR", ":8080"),
+			ReadTimeout:     envDuration("TAIFA_ID_HTTP_READ_TIMEOUT", 5*time.Second),
+			WriteTimeout:    envDuration("TAIFA_ID_HTTP_WRITE_TIMEOUT", 10*time.Second),
+			IdleTimeout:     envDuration("TAIFA_ID_HTTP_IDLE_TIMEOUT", 60*time.Second),
+			ShutdownTimeout: envDuration("TAIFA_ID_HTTP_SHUTDOWN_TIMEOUT", 10*time.Second),
+		},
+		Database: DatabaseConfig{
+			DSN:            envString("TAIFA_ID_DATABASE_DSN", ""),
+			MinConns:       envInt32("TAIFA_ID_DATABASE_MIN_CONNS", 1),
+			MaxConns:       envInt32("TAIFA_ID_DATABASE_MAX_CONNS", 5),
+			ConnectTimeout: envDuration("TAIFA_ID_DATABASE_CONNECT_TIMEOUT", 5*time.Second),
+		},
+		Auth: AuthConfig{
+			JWTSecret:   envString("TAIFA_ID_JWT_SECRET", ""),
+			JWTIssuer:   envString("TAIFA_ID_JWT_ISSUER", "taifa-id"),
+			JWTAudience: envString("TAIFA_ID_JWT_AUDIENCE", "taifa-republic"),
+			JWTTTL:      envDuration("TAIFA_ID_JWT_TTL", time.Hour),
+		},
+	}
+}
+
+func envString(key string, fallback string) string {
 	value := os.Getenv(key)
 	if value == "" {
 		return fallback
@@ -72,26 +71,21 @@ func getEnv(key string, fallback string) string {
 	return value
 }
 
-func getDurationEnv(key string, fallback time.Duration) time.Duration {
+func envDuration(key string, fallback time.Duration) time.Duration {
 	value := os.Getenv(key)
 	if value == "" {
 		return fallback
 	}
 
-	duration, err := time.ParseDuration(value)
-	if err == nil {
-		return duration
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return fallback
 	}
 
-	seconds, err := strconv.Atoi(value)
-	if err == nil {
-		return time.Duration(seconds) * time.Second
-	}
-
-	return fallback
+	return parsed
 }
 
-func getInt32Env(key string, fallback int32) int32 {
+func envInt32(key string, fallback int32) int32 {
 	value := os.Getenv(key)
 	if value == "" {
 		return fallback

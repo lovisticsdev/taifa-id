@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"taifa-id/internal/auth"
 	"taifa-id/internal/config"
 	"taifa-id/internal/credential"
 	"taifa-id/internal/membership"
@@ -20,6 +21,7 @@ import (
 	"taifa-id/internal/platform/httpserver"
 	"taifa-id/internal/platform/password"
 	"taifa-id/internal/platform/postgres"
+	"taifa-id/internal/platform/token"
 )
 
 type App struct {
@@ -91,7 +93,10 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	})
 
 	if dbPool != nil {
-		registerDomainRoutes(router, dbPool)
+		if err := registerDomainRoutes(router, dbPool, cfg); err != nil {
+			dbPool.Close()
+			return nil, err
+		}
 	}
 
 	server := httpserver.New(httpserver.Config{
@@ -109,7 +114,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}, nil
 }
 
-func registerDomainRoutes(router chi.Router, dbPool *pgxpool.Pool) {
+func registerDomainRoutes(router chi.Router, dbPool *pgxpool.Pool, cfg config.Config) error {
 	realClock := clock.NewRealClock()
 
 	personRepository := person.NewRepository(dbPool)
@@ -127,11 +132,29 @@ func registerDomainRoutes(router chi.Router, dbPool *pgxpool.Pool) {
 	membershipHandler := membership.NewHandler(membershipService)
 	membership.RegisterRoutes(router, membershipHandler)
 
-	credentialRepository := credential.NewRepository(dbPool)
 	passwordHasher := password.NewBcryptHasher(password.DefaultBcryptCost)
+
+	credentialRepository := credential.NewRepository(dbPool)
 	credentialService := credential.NewService(dbPool, credentialRepository, passwordHasher, realClock)
 	credentialHandler := credential.NewHandler(credentialService)
 	credential.RegisterRoutes(router, credentialHandler)
+
+	jwtManager, err := token.NewJWTManager(token.Config{
+		Secret:   cfg.Auth.JWTSecret,
+		Issuer:   cfg.Auth.JWTIssuer,
+		Audience: cfg.Auth.JWTAudience,
+		TTL:      cfg.Auth.JWTTTL,
+	})
+	if err != nil {
+		return fmt.Errorf("initialize jwt manager: %w", err)
+	}
+
+	authRepository := auth.NewRepository(dbPool)
+	authService := auth.NewService(dbPool, authRepository, passwordHasher, jwtManager, realClock)
+	authHandler := auth.NewHandler(authService)
+	auth.RegisterRoutes(router, authHandler)
+
+	return nil
 }
 
 func (a *App) Run(ctx context.Context) error {

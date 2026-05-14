@@ -12,11 +12,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"taifa-id/internal/config"
+	"taifa-id/internal/credential"
 	"taifa-id/internal/membership"
 	"taifa-id/internal/organization"
 	"taifa-id/internal/person"
 	"taifa-id/internal/platform/clock"
 	"taifa-id/internal/platform/httpserver"
+	"taifa-id/internal/platform/password"
 	"taifa-id/internal/platform/postgres"
 )
 
@@ -124,6 +126,12 @@ func registerDomainRoutes(router chi.Router, dbPool *pgxpool.Pool) {
 	membershipService := membership.NewService(dbPool, membershipRepository, realClock)
 	membershipHandler := membership.NewHandler(membershipService)
 	membership.RegisterRoutes(router, membershipHandler)
+
+	credentialRepository := credential.NewRepository(dbPool)
+	passwordHasher := password.NewBcryptHasher(password.DefaultBcryptCost)
+	credentialService := credential.NewService(dbPool, credentialRepository, passwordHasher, realClock)
+	credentialHandler := credential.NewHandler(credentialService)
+	credential.RegisterRoutes(router, credentialHandler)
 }
 
 func (a *App) Run(ctx context.Context) error {

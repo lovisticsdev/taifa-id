@@ -471,3 +471,75 @@ Role removed:
 ```text
 identity.membership_role.removed
 ```
+
+
+## Credentials
+
+### `POST /api/v1/credentials`
+
+Creates a credential for an existing active person.
+
+The plaintext password is accepted only at creation time. It is hashed with bcrypt before storage and is never returned by the API.
+
+Request:
+
+```json
+{
+  "person_id": "PER-...",
+  "username": "amina.provider",
+  "password": "ExampleDevPass123!"
+}
+```
+
+Rules:
+
+```text
+person_id must reference an existing ACTIVE person
+username is normalized to lowercase
+username must be unique
+password must be 8 to 256 characters
+```
+
+Response:
+
+```json
+{
+  "correlation_id": "corr-...",
+  "data": {
+    "id": "CRD-...",
+    "person_id": "PER-...",
+    "username": "amina.provider",
+    "status": "ACTIVE",
+    "created_at": "2026-05-14T15:00:00Z",
+    "updated_at": "2026-05-14T15:00:00Z"
+  }
+}
+```
+
+Errors:
+
+```text
+400 INVALID_JSON
+400 VALIDATION_ERROR
+404 NOT_FOUND
+409 CONFLICT
+500 INTERNAL_ERROR
+```
+
+### `GET /api/v1/credentials/{credential_id}`
+
+Returns a credential without the password hash.
+
+### `GET /api/v1/persons/{person_id}/credentials`
+
+Lists credentials for a person without password hashes.
+
+## Credential Audit Events
+
+Credential creation writes to `audit_outbox`.
+
+Created credential:
+
+```text
+identity.credential.created
+```

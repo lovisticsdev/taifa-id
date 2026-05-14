@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"taifa-id/internal/actorcontext"
 	"taifa-id/internal/auth"
 	"taifa-id/internal/config"
 	"taifa-id/internal/credential"
@@ -153,6 +154,11 @@ func registerDomainRoutes(router chi.Router, dbPool *pgxpool.Pool, cfg config.Co
 	authService := auth.NewService(dbPool, authRepository, passwordHasher, jwtManager, realClock)
 	authHandler := auth.NewHandler(authService)
 	auth.RegisterRoutes(router, authHandler)
+
+	actorContextRepository := actorcontext.NewRepository(dbPool)
+	actorContextService := actorcontext.NewService(dbPool, actorContextRepository, jwtManager, realClock)
+	actorContextHandler := actorcontext.NewHandler(actorContextService)
+	actorcontext.RegisterRoutes(router, actorContextHandler)
 
 	return nil
 }

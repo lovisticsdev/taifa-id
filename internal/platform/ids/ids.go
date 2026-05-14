@@ -3,6 +3,7 @@ package ids
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -13,12 +14,21 @@ func New(prefix string) string {
 		prefix = "ID"
 	}
 
-	randomBytes := make([]byte, 8)
-	if _, err := rand.Read(randomBytes); err != nil {
-		return prefix + "-" + time.Now().UTC().Format("20060102150405.000000000")
+	random := make([]byte, 8)
+	if _, err := rand.Read(random); err != nil {
+		return fmt.Sprintf(
+			"%s-%s-fallback",
+			strings.ToUpper(prefix),
+			time.Now().UTC().Format("20060102150405"),
+		)
 	}
 
-	return prefix + "-" + time.Now().UTC().Format("20060102150405") + "-" + hex.EncodeToString(randomBytes)
+	return fmt.Sprintf(
+		"%s-%s-%s",
+		strings.ToUpper(prefix),
+		time.Now().UTC().Format("20060102150405"),
+		hex.EncodeToString(random),
+	)
 }
 
 func NewPersonID() string {
@@ -51,4 +61,8 @@ func NewEventID() string {
 
 func NewCorrelationID() string {
 	return New("corr")
+}
+
+func NewActorContextID() string {
+	return New("ACTX")
 }

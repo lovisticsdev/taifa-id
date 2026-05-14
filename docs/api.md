@@ -650,3 +650,99 @@ Token introspection:
 ```text
 identity.auth.token_introspected
 ```
+
+
+## Actor Context
+
+### `POST /api/v1/actor-context/resolve`
+
+Resolves an authenticated person into an organization-scoped actor context.
+
+The request must contain a valid JWT issued by TaifaID and the organization the actor wants to operate under.
+
+Request:
+
+```json
+{
+  "token": "eyJ...",
+  "organization_id": "ORG-..."
+}
+```
+
+Resolution checks:
+
+```text
+token signature is valid
+token issuer and audience are valid
+token is not expired
+credential is ACTIVE
+person is ACTIVE
+organization exists
+organization is ACTIVE
+person has at least one ACTIVE membership in the organization
+roles are collected from active memberships in that organization
+```
+
+Response:
+
+```json
+{
+  "correlation_id": "corr-...",
+  "data": {
+    "actor_context_id": "ACTX-...",
+    "person_id": "PER-...",
+    "credential_id": "CRD-...",
+    "username": "amina.actor",
+    "organization_id": "ORG-...",
+    "memberships": [
+      {
+        "id": "MEM-...",
+        "membership_type": "PROVIDER_STAFF"
+      }
+    ],
+    "roles": [
+      "PROVIDER_CLINICIAN"
+    ],
+    "session_id": "SES-...",
+    "issued_at": "2026-05-14T17:00:00Z",
+    "expires_at": "2026-05-14T18:00:00Z",
+    "resolved_at": "2026-05-14T17:05:00Z"
+  }
+}
+```
+
+Important boundary:
+
+```text
+A JWT proves authentication.
+
+An actor context proves the authenticated person is currently allowed to act inside a specific organization context.
+
+Route-level authorization still belongs to TaifaExchange.
+Domain authorization still belongs to the target domain system.
+```
+
+Errors:
+
+```text
+400 INVALID_JSON
+400 VALIDATION_ERROR
+401 UNAUTHORIZED
+403 FORBIDDEN
+404 NOT_FOUND
+500 INTERNAL_ERROR
+```
+
+## Actor Context Audit Events
+
+Allowed resolution:
+
+```text
+identity.actor_context.allowed
+```
+
+Denied resolution:
+
+```text
+identity.actor_context.denied
+```

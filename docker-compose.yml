@@ -1,45 +1,87 @@
-name: taifa-id
-
 services:
-  postgres:
+  taifa-id-postgres:
     image: postgres:latest
     container_name: taifa-id-postgres
     environment:
-      POSTGRES_DB: taifa_id
       POSTGRES_USER: taifa
       POSTGRES_PASSWORD: taifa_dev_password
+      POSTGRES_DB: taifa_id
     ports:
-      - "5432:5432"
+      - "55432:5432"
     volumes:
-      - taifa_id_postgres_data:/var/lib/postgresql/data
+      - taifa-id-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U taifa -d taifa_id"]
       interval: 5s
       timeout: 5s
       retries: 20
 
-  taifa-id:
-    profiles:
-      - app
+  taifa-id-migrate:
+    image: postgres:latest
+    container_name: taifa-id-migrate
+    depends_on:
+      taifa-id-postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations:ro
+    environment:
+      DATABASE_URL: postgres://taifa:taifa_dev_password@taifa-id-postgres:5432/taifa_id?sslmode=disable
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        for migration in /migrations/*.up.sql; do
+          echo "applying $$migration"
+          psql "$$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$$migration"
+        done
+
+  taifa-id-seed:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: taifa-id-api
+    image: taifa-id:local
+    container_name: taifa-id-seed
+    depends_on:
+      taifa-id-migrate:
+        condition: service_completed_successfully
     environment:
-      TAIFA_ID_SERVICE_NAME: taifa-id
-      TAIFA_ID_ENV: local
-      TAIFA_ID_HTTP_ADDR: ":8080"
-      TAIFA_ID_DATABASE_DSN: "host=postgres port=5432 user=taifa password=taifa_dev_password dbname=taifa_id sslmode=disable"
-      TAIFA_ID_DATABASE_CONNECT_TIMEOUT: "15s"
-      TAIFA_ID_JWT_SECRET: "replace-this-with-a-long-local-dev-secret-at-least-32-chars"
-      TAIFA_ID_JWT_ISSUER: "taifa-id"
-      TAIFA_ID_JWT_AUDIENCE: "taifa-republic"
-      TAIFA_ID_JWT_TTL: "1h"
+      TAIFA_ID_DATABASE_DSN: host=taifa-id-postgres port=5432 user=taifa password=taifa_dev_password dbname=taifa_id sslmode=disable
+      TAIFA_ID_DATABASE_CONNECT_TIMEOUT: 15s
+      TAIFA_ID_SEED_TIMEOUT: 5m
+    entrypoint: ["/usr/local/bin/taifa-id-seed"]
+
+  taifa-id:
+    build:
+      context: .
+    image: taifa-id:local
+    container_name: taifa-id
+    depends_on:
+      taifa-id-postgres:
+        condition: service_healthy
+      taifa-id-migrate:
+        condition: service_completed_successfully
+      taifa-id-seed:
+        condition: service_completed_successfully
     ports:
       - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
+    environment:
+      TAIFA_ID_SERVICE_NAME: taifa-id
+      TAIFA_ID_ENV: docker
+      TAIFA_ID_HTTP_ADDR: :8080
+      TAIFA_ID_HTTP_READ_TIMEOUT: 5s
+      TAIFA_ID_HTTP_WRITE_TIMEOUT: 10s
+      TAIFA_ID_HTTP_IDLE_TIMEOUT: 60s
+      TAIFA_ID_HTTP_SHUTDOWN_TIMEOUT: 10s
+
+      TAIFA_ID_DATABASE_DSN: host=taifa-id-postgres port=5432 user=taifa password=taifa_dev_password dbname=taifa_id sslmode=disable
+      TAIFA_ID_DATABASE_MIN_CONNS: 1
+      TAIFA_ID_DATABASE_MAX_CONNS: 5
+      TAIFA_ID_DATABASE_CONNECT_TIMEOUT: 15s
+
+      TAIFA_ID_JWT_SECRET: replace-this-with-a-long-local-dev-secret-at-least-32-chars
+      TAIFA_ID_JWT_ISSUER: taifa-id
+      TAIFA_ID_JWT_AUDIENCE: taifa-republic
+      TAIFA_ID_JWT_TTL: 1h
 
 volumes:
-  taifa_id_postgres_data:
+  taifa-id-postgres-data:

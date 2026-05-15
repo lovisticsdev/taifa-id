@@ -1,34 +1,40 @@
-ARG GO_VERSION=1.26
-
-FROM golang:${GO_VERSION}-alpine AS build
+FROM golang:1.26-alpine AS build
 
 WORKDIR /src
 
-RUN apk add --no-cache ca-certificates git
+RUN apk add --no-cache ca-certificates tzdata
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 go build \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -trimpath \
     -ldflags="-s -w" \
     -o /out/taifa-id \
     ./cmd/taifa-id
 
-FROM alpine:3.22
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /out/taifa-id-seed \
+    ./cmd/taifa-id-seed
 
-RUN apk add --no-cache ca-certificates \
-    && addgroup -S app \
-    && adduser -S -G app app
+FROM alpine:latest
 
-WORKDIR /app
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -S taifa \
+    && adduser -S taifa -G taifa
 
-COPY --from=build /out/taifa-id /app/taifa-id
+COPY --from=build /out/taifa-id /usr/local/bin/taifa-id
+COPY --from=build /out/taifa-id-seed /usr/local/bin/taifa-id-seed
 
-USER app
+USER taifa
 
 EXPOSE 8080
 
-ENTRYPOINT ["/app/taifa-id"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1
+
+ENTRYPOINT ["/usr/local/bin/taifa-id"]
